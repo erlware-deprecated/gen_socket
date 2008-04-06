@@ -21,7 +21,7 @@
 -record(state, {
                 listener,       % Listening socket
                 acceptor,       % Asynchronous acceptor's internal reference
-                module,         % FSM handling module
+                module,         % client handling module
                 sup_name,       % Supervisor's registered name
                 uds_port        % Unix Domain Socket driver port.
                }).
@@ -36,7 +36,7 @@
 %%      `ListenerSupName' is the name given to the listening process
 %%      supervisor.  `ConnectionSupName' is the name given to the
 %%      supervisor of spawned client connections.  The listener will be
-%%      started on a given `Port'.  `Module' is the FSM implementation
+%%      started on a given `Port'.  `Module' is the implementation
 %%      of the user-level protocol.  This module must implement
 %%      `set_socket/2' function.
 %% @end
@@ -150,7 +150,7 @@ handle_info({inet_async, ListSock, Ref, {ok, CliSocket}},
         %% supervisor.
         {ok, Pid} = gen_socket_listener_sup:start_client(SupName),
         gen_tcp:controlling_process(CliSocket, Pid),
-        %% Instruct the new FSM that it owns the socket.
+        %% Instruct the new process that it owns the socket.
         Module:set_socket(Pid, CliSocket),
         {ok, NewRef} = prim_inet:async_accept(ListSock, -1),
         {noreply, State#state{acceptor=NewRef}};
