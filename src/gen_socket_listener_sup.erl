@@ -1,7 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% @author Serge Aleynikov <saleyn@gmail.com>
 %%% @copyright (C) 2007, 2008, Serge Aleynikov
-%%% @doc Generic Socket listener supervisor. See:
+%%% @doc Generic socket listener supervisor. See:
 %%%      [http://www.trapexit.org/index.php/Building_a_Non-blocking_TCP_server_using_OTP_principles]
 %%%
 %%% <pre>
