@@ -1,54 +1,28 @@
-%%%------------------------------------------------------------------------
-%%% File: $Id$
-%%%------------------------------------------------------------------------
-%%% @doc Generic TCP listener supervisor. See:
+%%%-------------------------------------------------------------------
+%%% @author Serge Aleynikov <saleyn@gmail.com>
+%%% @copyright (C) 2007, 2008, Serge Aleynikov
+%%% @doc Generic Socket listener supervisor. See:
 %%%      [http://www.trapexit.org/index.php/Building_a_Non-blocking_TCP_server_using_OTP_principles]
 %%%
 %%% <pre>
 %%%    Here is how to add this server to a supervision tree:
 %%%
 %%%    init([]) ->
-%%%        % TCP Server supervisor specification
-%%%        TcpSupSpec =
-%%%            tcp_listener_sup:get_supervisor_spec(
+%%%        % Socket Server supervisor specification
+%%%        SupSpec =
+%%%            gen_socket_listener_sup:get_supervisor_spec(
 %%%                _NamePrefix    = "myserver",
-%%%                _TcpListenPort = 9999,
-%%%                _TcpProtoFsm   = client_handling_fsm,
+%%%                _ListenPort    = 9999,
+%%%                _HandlerModule = client_handling_module,
 %%%                _Args          = [MsgDecoder, MsgHandler]
 %%%            ),
 %%%
-%%%        {ok, {_SupFlags = {one_for_one, 3, 60}, [TcpSupSpec]} }.
+%%%        {ok, {_SupFlags = {one_for_one, 3, 60}, [SupSpec]} }.
 %%% </pre>
-%%% @author  Serge Aleynikov <saleyn@gmail.com>
-%%% @version $Rev$
-%%%          $Date$
 %%% @end
-%%%------------------------------------------------------------------------
 %%% Created 2007-07-14
-%%%------------------------------------------------------------------------
-%%% Copyright (c) 2007 Serge Aleynikov
-%%%
-%%% Permission is hereby granted, free of charge, to any person obtaining
-%%% a copy of this software and associated documentation files
-%%% (the "Software"), to deal in the Software without restriction,
-%%% including without limitation the rights to use, copy,
-%%% modify, merge, publish, distribute, sublicense, and/or sell copies of
-%%% the Software, and to permit persons to whom the Software is furnished
-%%% to do so, subject to the following conditions:
-%%%
-%%% The above copyright notice and this permission notice shall be
-%%% included in all copies or substantial portions of the Software.
-%%%
-%%% THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-%%% EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-%%% OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-%%% NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-%%% BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-%%% ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-%%% CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-%%% THE SOFTWARE.
-%%%------------------------------------------------------------------------
--module(tcp_listener_sup).
+%%%-------------------------------------------------------------------
+-module(gen_socket_listener_sup).
 -author('saleyn@gmail.com').
 
 -behaviour(supervisor).
@@ -66,31 +40,31 @@
 -define(MAX_TIME,      60).
 
 %%-------------------------------------------------------------------------
-%% @spec (SupNamePrefix, Port, HandlerModule, ServerArgs) -> TcpSupSpec::tuple()
+%% @spec (SupNamePrefix, Port, HandlerModule, ServerArgs) -> SupSpec::tuple()
 %%         SupNamePrefix  = string()
 %%         Port           = integer()
 %%         HandlerModule  = atom()
 %%         ServerArgs     = [ term() ]
 %% @doc Generates the supervisor specification that can be used by the
 %%      application top supervisor's init/1 callback function that
-%%      wants to link TCP server under its supervision tree.
+%%      wants to link socket server under its supervision tree.
 %%      `SupNamePrefix' is the perfix used for naming listener supervisor
 %%      (SupNamePrefix ++ "listener_sup") and connection manager supervisor
 %%      (SupNamePrefix ++ "connection_sup").
-%%      `HandlerModule' is the module implementing a user protocol FSM, whose `start_link'
-%%      function should accept `ServerArgs'.
+%%      `HandlerModule' is the module implementing a user protocol process,
+%%        whose `start_link' function should accept `ServerArgs'.
 %% @end
 %%-------------------------------------------------------------------------
-get_supervisor_spec(TcpSupNamePrefix, Port, FsmHandlerModule, FsmHandlerModuleArgs) ->
-    TcpSupName      = create_name(TcpSupNamePrefix, "tcp_server"),
-    TcpListenerArgs = [TcpSupName, TcpSupNamePrefix, Port, FsmHandlerModule, FsmHandlerModuleArgs],
-    % TCP Listener
-    {   TcpSupName,                                    % Id       = internal id
-        {tcp_listener_sup,start_link,TcpListenerArgs}, % StartFun = {M, F, A}
+get_supervisor_spec(SupNamePrefix, Port, HandlerModule, HandlerModuleArgs) ->
+    SupName      = create_name(SupNamePrefix, "socket_server"),
+    ListenerArgs = [SupName, SupNamePrefix, Port, HandlerModule, HandlerModuleArgs],
+    % Socket Listener
+    {   SupName,                                       % Id       = internal id
+        {gen_socket_listener_sup, start_link, ListenerArgs}, % StartFun = {M, F, A}
         permanent,                                     % Restart  = permanent | transient | temporary
         2000,                                          % Shutdown = brutal_kill | int() >= 0 | infinity
         worker,                                        % Type     = worker | supervisor
-        [tcp_listener_sup]                             % Modules  = [Module] | dynamic
+        [gen_socket_listener_sup]                      % Modules  = [Module] | dynamic
     }.
 
 %%-------------------------------------------------------------------------
@@ -101,8 +75,9 @@ get_supervisor_spec(TcpSupNamePrefix, Port, FsmHandlerModule, FsmHandlerModuleAr
 %%         HandlerModule  = atom()
 %%         ServerArgs     = [ term() ]
 %%
-%% @doc To be called by the top-level application supervisor to start TCP server listener.
-%%      `RegisteredName' is the registered name of the TCP server's supervisor.
+%% @doc To be called by the top-level application supervisor to
+%% start socket server listener.
+%% `RegisteredName' is the registered name of the socket server's supervisor.
 %% @see get_supervisor_spec/4
 %% @end
 %%-------------------------------------------------------------------------
@@ -112,8 +87,9 @@ start_link(RegisteredName, SupNamePrefix, Port, HandlerModule, ServerArgs)
 
 %%-------------------------------------------------------------------------
 %% @spec (SupName) -> {ok, Pid}
-%% @doc An internal startup function for spawning new client connection handling FSMs.
-%% To be called by the tcp_listener process.
+%% @doc An internal startup function for spawning new client connection
+%% handling processes.
+%% To be called by the gen_socket_listener process.
 %% @end
 %% @private
 %%-------------------------------------------------------------------------
@@ -132,13 +108,13 @@ init([Name, Port, Module, ServerArgs]) ->
     {ok,
         {_SupFlags = {one_for_one, ?MAX_RESTART, ?MAX_TIME},
             [
-              % TCP Listener
+              % Socket Listener
               {   ListenerSupName,                         % Id       = internal id
-                  {tcp_listener,start_link,Args},          % StartFun = {M, F, A}
+                  {gen_socket_listener,start_link,Args},   % StartFun = {M, F, A}
                   permanent,                               % Restart  = permanent | transient | temporary
                   2000,                                    % Shutdown = brutal_kill | int() >= 0 | infinity
                   worker,                                  % Type     = worker | supervisor
-                  [tcp_listener]                           % Modules  = [Module] | dynamic
+                  [gen_socket_listener]                    % Modules  = [Module] | dynamic
               },
               % Client instance supervisor
               {   ConnectionSupName,
@@ -157,7 +133,7 @@ init([{connection, [Module, Args]}]) ->
     {ok,
         {_SupFlags = {simple_one_for_one, ?MAX_RESTART, ?MAX_TIME},
             [
-              % TCP Client
+              % Socket Client
               {   undefined,                               % Id       = internal id
                   {Module,start_link,Args},                % StartFun = {M, F, A}
                   temporary,                               % Restart  = permanent | transient | temporary
