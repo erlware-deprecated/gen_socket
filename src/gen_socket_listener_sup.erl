@@ -14,7 +14,7 @@
 %%%                _NamePrefix    = "myserver",
 %%%                _ListenPort    = 9999,
 %%%                _HandlerModule = client_handling_module,
-%%%                _Args          = [MsgDecoder, MsgHandler]
+%%%                _Args          = ServerArgs::list()
 %%%            ),
 %%%
 %%%        {ok, {_SupFlags = {one_for_one, 3, 60}, [SupSpec]} }.
