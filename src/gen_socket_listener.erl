@@ -36,7 +36,7 @@
 %%      `ListenerSupName' is the name given to the listening process
 %%      supervisor.  `ConnectionSupName' is the name given to the
 %%      supervisor of spawned client connections.  The listener will be
-%%      started on a given `Port'.  `Module' is the implementation
+%%      started on the given `Port'.  `Module' is the implementation
 %%      of the user-level protocol.  This module must implement
 %%      `set_socket/2' function.
 %% @end
@@ -71,7 +71,7 @@ init([ConnSupName, Port, Module]) ->
         Error                -> UdsPort = none, LSock = none, throw(Error)
         end,
 
-        %%Create first accepting process
+        % Create first accepting process
         {ok, Ref} = prim_inet:async_accept(LSock, -1),
         {ok, #state{listener = LSock,
                     acceptor = Ref,

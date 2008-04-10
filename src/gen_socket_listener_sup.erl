@@ -48,16 +48,16 @@
 %% @doc Generates the supervisor specification that can be used by the
 %%      application top supervisor's init/1 callback function that
 %%      wants to link socket server under its supervision tree.
-%%      `SupNamePrefix' is the perfix used for naming listener supervisor
-%%      (SupNamePrefix ++ "listener_sup") and connection manager supervisor
+%%      `SupNamePrefix' is the prefix used for naming the listener supervisor
+%%      (SupNamePrefix ++ "listener_sup") and the connection manager supervisor
 %%      (SupNamePrefix ++ "connection_sup").
 %%      `HandlerModule' is the module implementing a user protocol process,
 %%        whose `start_link' function should accept `ServerArgs'.
 %% @end
 %%-------------------------------------------------------------------------
-get_supervisor_spec(SupNamePrefix, Port, HandlerModule, HandlerModuleArgs) ->
+get_supervisor_spec(SupNamePrefix, Port, HandlerModule, ServerArgs) ->
     SupName      = create_name(SupNamePrefix, "socket_server"),
-    ListenerArgs = [SupName, SupNamePrefix, Port, HandlerModule, HandlerModuleArgs],
+    ListenerArgs = [SupName, SupNamePrefix, Port, HandlerModule, ServerArgs],
     % Socket Listener
     {   SupName,                                       % Id       = internal id
         {gen_socket_listener_sup, start_link, ListenerArgs}, % StartFun = {M, F, A}
