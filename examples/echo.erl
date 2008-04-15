@@ -50,7 +50,7 @@ start_link() ->
 %
 % @set_socket(Pid, Socket) -> void
 set_socket(Pid, Socket) ->
-    Pid! {socket_ready, Socket}.
+    Pid ! {socket_ready, Socket}.
 
 % This is the main server loop for the echo example. The socket_ready
 % message tells the server which socket it is responsible for. The tcp
