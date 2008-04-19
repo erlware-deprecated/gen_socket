@@ -1,0 +1,13 @@
+@title The gen_socket application
+@doc 
+
+<p>
+gen_socket provides a non-blocking generic socket server that can be
+used with TCP and UNIX domain sockets. The server is implemented as
+an OTP supervisor tree. The main supervisor creates a listening server
+that accepts incoming connections. A secondary supervisor creates and
+manages user-provided processes for each accepted connection.
+</p>
+
+@author Serge Aleynikov
+@copyright 2008 Serge Aleynikov
