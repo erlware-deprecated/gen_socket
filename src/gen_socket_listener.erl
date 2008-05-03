@@ -52,7 +52,7 @@ start_link(ListenerSupName, ConnectionSupName, Port, Module, Options)
   when is_atom(ListenerSupName), is_atom(ConnectionSupName),
        is_integer(Port), is_atom(Module) ->
     gen_server:start_link({local, ListenerSupName}, ?MODULE,
-                          [ConnectionSupName, Port, Module], []).
+                          [ConnectionSupName, Port, Module, Options], []).
 
 %%%------------------------------------------------------------------------
 %%% Callback functions from gen_server
@@ -69,10 +69,9 @@ start_link(ListenerSupName, ConnectionSupName, Port, Module, Options)
 %% @end
 %% @private
 %%----------------------------------------------------------------------
-init([ConnSupName, Port, Module]) ->
+init([ConnSupName, Port, Module, Options]) ->
     process_flag(trap_exit, true),
-    Opts = [binary, {packet, 2}, {reuseaddr, true},
-            {keepalive, true}, {active, false}],
+    Opts = make_socket_opts(Port, Options),
     try
         case listen_socket(Port, Opts) of
         {ok, LSock}          -> UdsPort = undefined;
@@ -91,10 +90,27 @@ init([ConnSupName, Port, Module]) ->
         {stop, What}
     end.
 
+%% @private
+%% Return a list of socket options for the given port.
+make_socket_opts(Port, Options) ->
+    case lists:keysearch(socket_opts, 1, Options) of
+        {value, SocketOptions} ->
+            ok;
+        false ->
+            SocketOptions = [binary, {packet, raw}, {reuseaddr, true},
+                             {keepalive, true}, {active, false}, {backlog, 30}]
+    end,
+
+    case is_integer(Port) of
+        true -> SocketOptions;
+        false -> lists:keydelete(backlog, 1, SocketOptions)
+    end.
+
+%% @private
+%% Open the listening socket with the given options.
 listen_socket(Port, Opts) when is_integer(Port) ->
     % Open an INET socket
-    Backlog = 30,
-    gen_tcp:listen(Port, Opts ++ [{backlog, Backlog}]);
+    gen_tcp:listen(Port, Opts);
 listen_socket(Filename, Opts) when is_list(Filename) ->
     % Open a UDS socket
     try
