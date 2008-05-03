@@ -42,8 +42,10 @@
 %% @end
 %%----------------------------------------------------------------------
 start_link(ListenerSupName, ConnectionSupName, Port, Module)
-  when is_atom(ListenerSupName), is_atom(ConnectionSupName), is_integer(Port), is_atom(Module) ->
-    gen_server:start_link({local, ListenerSupName}, ?MODULE, [ConnectionSupName, Port, Module], []).
+  when is_atom(ListenerSupName), is_atom(ConnectionSupName),
+       is_integer(Port), is_atom(Module) ->
+    gen_server:start_link({local, ListenerSupName}, ?MODULE,
+                          [ConnectionSupName, Port, Module], []).
 
 %%%------------------------------------------------------------------------
 %%% Callback functions from gen_server
@@ -143,7 +145,8 @@ handle_cast(_Msg, State) ->
 %% @private
 %%-------------------------------------------------------------------------
 handle_info({inet_async, ListSock, Ref, {ok, CliSocket}},
-            #state{listener=ListSock, acceptor=Ref, module=Module, sup_name=SupName} = State) ->
+            #state{listener=ListSock, acceptor=Ref,
+                   module=Module, sup_name=SupName} = State) ->
     case set_sockopt(ListSock, CliSocket) of
     ok ->
         %% New client connected - spawn a new process using the simple_one_for_one
@@ -159,7 +162,8 @@ handle_info({inet_async, ListSock, Ref, {ok, CliSocket}},
         {stop, Reason, State}
     end;
 
-handle_info({inet_async, ListSock, Ref, Error}, #state{listener=ListSock, acceptor=Ref} = State) ->
+handle_info({inet_async, ListSock, Ref, Error},
+            #state{listener=ListSock, acceptor=Ref} = State) ->
     error_logger:error_msg("Error in socket acceptor: ~p.\n", [Error]),
     {stop, Error, State};
 
@@ -199,7 +203,8 @@ code_change(_OldVsn, State, _Extra) ->
 %% listening socket to the new client socket.
 set_sockopt(ListSock, CliSocket) ->
     true = inet_db:register_socket(CliSocket, inet_tcp),
-    case prim_inet:getopts(ListSock, [active, nodelay, keepalive, delay_send, priority, tos]) of
+    case prim_inet:getopts(ListSock, [active, nodelay, keepalive,
+                                      delay_send, priority, tos]) of
     {ok, Opts} ->
         case prim_inet:setopts(CliSocket, Opts) of
         ok    -> ok;
