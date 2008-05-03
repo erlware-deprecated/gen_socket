@@ -34,7 +34,15 @@
 %
 % @spec start_demo() -> {ok, Pid}
 start_demo() ->
-    gen_socket_listener_sup:start_link(echo, "echo", 9999, echo, []).
+    io:format("Starting echo server on port 9999.~n"),
+    io:format("Connect with the server with:~n"),
+    io:format("  telnet localhost 9999~n"),
+    io:format("or~n"),
+    io:format("  netcat localhost 9999~n~n"),
+    {ok, Pid} = gen_socket_listener_sup:start_link(echo, "echo",
+                                                   9999, echo, []),
+    unlink(Pid),
+    Pid.
 
 % This is called by the connection supervisor when the
 % gen_socket_listener_sup:start_client function is called.
