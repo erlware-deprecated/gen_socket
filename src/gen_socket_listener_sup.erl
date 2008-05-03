@@ -28,7 +28,7 @@
 -behaviour(supervisor).
 
 %% External API
--export([start_link/5, get_supervisor_spec/4]).
+-export([start_link/6, start_link/5, get_supervisor_spec/5, get_supervisor_spec/4]).
 
 %% Internal API
 -export([start_client/1]).
@@ -40,24 +40,33 @@
 -define(MAX_TIME,      60).
 
 %%-------------------------------------------------------------------------
-%% @spec (SupNamePrefix, Port, HandlerModule, ServerArgs) -> SupSpec::tuple()
+%% @spec (SupNamePrefix, Port, HandlerModule, ServerArgs, Options)
+%%                                                   -> SupSpec::tuple()
 %%         SupNamePrefix  = string()
 %%         Port           = integer()
 %%         HandlerModule  = atom()
 %%         ServerArgs     = [ term() ]
+%%         Options        = list()
+%%
 %% @doc Generates the supervisor specification that can be used by the
 %%      application top supervisor's init/1 callback function that
 %%      wants to link socket server under its supervision tree.
 %%      `SupNamePrefix' is the prefix used for naming the listener supervisor
 %%      (SupNamePrefix ++ "listener_sup") and the connection manager supervisor
 %%      (SupNamePrefix ++ "connection_sup").
+%%
 %%      `HandlerModule' is the module implementing a user protocol process,
-%%        whose `start_link' function should accept `ServerArgs'.
+%%      whose `start_link' function should accept `ServerArgs'.
+%%
+%%      `Options' is a list of options that will be passed to the
+%%      listener server.
+%% @see gen_socket_listener:start_link/5
 %% @end
 %%-------------------------------------------------------------------------
-get_supervisor_spec(SupNamePrefix, Port, HandlerModule, ServerArgs) ->
+get_supervisor_spec(SupNamePrefix, Port, HandlerModule, ServerArgs, Options) ->
     SupName      = create_name(SupNamePrefix, "socket_server"),
-    ListenerArgs = [SupName, SupNamePrefix, Port, HandlerModule, ServerArgs],
+    ListenerArgs = [SupName, SupNamePrefix, Port,
+                    HandlerModule, ServerArgs, Options],
     % Socket Listener
     {SupName,                    % Id       = internal id
      {gen_socket_listener_sup,
@@ -69,24 +78,47 @@ get_supervisor_spec(SupNamePrefix, Port, HandlerModule, ServerArgs) ->
     }.
 
 %%-------------------------------------------------------------------------
-%% @spec (RegisteredName, SupNamePrefix, Port, HandlerModule, ServerArgs)
+%% @spec (SupNamePrefix, Port, HandlerModule, ServerArgs) -> SupSpec::tuple()
+%%
+%% @doc This is equivalent to get_supervisor_spec/5 with an empty
+%% set of options.
+%% @end
+%%-------------------------------------------------------------------------
+get_supervisor_spec(SupNamePrefix, Port, HandlerModule, ServerArgs) ->
+    get_supervisor_spec(SupNamePrefix, Port, HandlerModule, ServerArgs, []).
+
+%%-------------------------------------------------------------------------
+%% @spec (RegisteredName, SupNamePrefix, Port, HandlerModule, ServerArgs, Options)
 %%                                                              -> {ok, Pid}
 %%         RegisteredName = string()
 %%         SupNamePrefix  = atom()
 %%         Port           = integer()
 %%         HandlerModule  = atom()
 %%         ServerArgs     = [ term() ]
+%%         Options        = list()
 %%
 %% @doc To be called by the top-level application supervisor to
 %% start socket server listener.
+%%
 %% `RegisteredName' is the registered name of the socket server's supervisor.
-%% @see get_supervisor_spec/4
+%% @see get_supervisor_spec/5
 %% @end
 %%-------------------------------------------------------------------------
-start_link(RegisteredName, SupNamePrefix, Port, HandlerModule, ServerArgs)
-  when is_atom(RegisteredName), is_list(SupNamePrefix) ->
+start_link(RegisteredName, SupNamePrefix, Port, HandlerModule, ServerArgs, Options)
+  when is_atom(RegisteredName), is_list(SupNamePrefix), is_list(Options) ->
     supervisor:start_link({local, RegisteredName}, ?MODULE,
-                          [SupNamePrefix, Port, HandlerModule, ServerArgs]).
+                          [SupNamePrefix, Port, HandlerModule,
+                           ServerArgs, Options]).
+
+%%-------------------------------------------------------------------------
+%% @spec (RegisteredName, SupNamePrefix, Port, HandlerModule, ServerArgs)
+%%                                                      -> {ok, Pid}
+%%
+%% @doc This is equivalent to start_link/6 with an empty set of options.
+%% @end
+%%-------------------------------------------------------------------------
+start_link(RegisteredName, SupNamePrefix, Port, HandlerModule, ServerArgs) ->
+    start_link(RegisteredName, SupNamePrefix, Port, HandlerModule, ServerArgs, []).
 
 %%-------------------------------------------------------------------------
 %% @spec (SupName) -> {ok, Pid}
@@ -104,10 +136,10 @@ start_client(SupName) ->
 %%%------------------------------------------------------------------------
 
 %% @private
-init([Name, Port, Module, ServerArgs]) ->
+init([Name, Port, Module, ServerArgs, Options]) ->
     ListenerSupName   = create_name(Name, "listener"),
     ConnectionSupName = create_name(Name, "connection"),
-    Args = [ListenerSupName, ConnectionSupName, Port, Module],
+    Args = [ListenerSupName, ConnectionSupName, Port, Module, Options],
     {ok,
      {_SupFlags = {one_for_one, ?MAX_RESTART, ?MAX_TIME},
       [

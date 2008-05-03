@@ -12,7 +12,7 @@
 -behaviour(gen_server).
 
 %% External API
--export([start_link/4]).
+-export([start_link/5]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
@@ -27,21 +27,28 @@
                }).
 
 %%--------------------------------------------------------------------
-%% @spec (ListenerSupName, ConnectionSupName, Port::integer(), Module) -> Result
+%% @spec (ListenerSupName, ConnectionSupName, Port::integer(),
+%%        Module, Options::list())  -> Result
 %%          ListenerSupName   = atom()
 %%          ConnectionSupName = atom()
 %%          Result            = {ok, Pid} | {error, Reason}
-%%
+%%          Options           = [ Option ]
+%%          Option            = {socket_opts, SocketOptions::list()}
 %% @doc Called by a supervisor to start the listening process.
 %%      `ListenerSupName' is the name given to the listening process
-%%      supervisor.  `ConnectionSupName' is the name given to the
+%%      supervisor. `ConnectionSupName' is the name given to the
 %%      supervisor of spawned client connections.  The listener will be
-%%      started on the given `Port'.  `Module' is the implementation
-%%      of the user-level protocol.  This module must implement
-%%      `set_socket/2' function.
+%%      started on the given `Port'. `Module' is the implementation
+%%      of the user-level protocol.
+%%
+%%      `Options' is a list of listener options. Currently the only
+%%      supported option is {socket_opts, SocketOptions::list()}, where
+%%      `SocketOptions' is a list of options supported by `gen_tcp:listen/2'.
+%%
+%% This module must implement a `set_socket/2' function.
 %% @end
 %%----------------------------------------------------------------------
-start_link(ListenerSupName, ConnectionSupName, Port, Module)
+start_link(ListenerSupName, ConnectionSupName, Port, Module, Options)
   when is_atom(ListenerSupName), is_atom(ConnectionSupName),
        is_integer(Port), is_atom(Module) ->
     gen_server:start_link({local, ListenerSupName}, ?MODULE,
