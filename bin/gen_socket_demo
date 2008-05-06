@@ -2,7 +2,7 @@
 
 #### Fill in values for these variables ####
 REL_NAME=gen_socket_demo
-REL_VSN=0.1.1
+REL_VSN=0.1.2
 ERTS_VSN=5.5.5
 INVOCATION_SUFFIX="-run echo start_demo"
 ###########################################
