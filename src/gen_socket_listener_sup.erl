@@ -28,7 +28,8 @@
 -behaviour(supervisor).
 
 %% External API
--export([start_link/6, start_link/5, get_supervisor_spec/5, get_supervisor_spec/4]).
+-export([start_link/6, start_link/5,
+         get_supervisor_spec/5, get_supervisor_spec/4]).
 
 %% Internal API
 -export([start_client/1]).
@@ -88,8 +89,8 @@ get_supervisor_spec(SupNamePrefix, Port, HandlerModule, ServerArgs) ->
     get_supervisor_spec(SupNamePrefix, Port, HandlerModule, ServerArgs, []).
 
 %%-------------------------------------------------------------------------
-%% @spec (RegisteredName, SupNamePrefix, Port, HandlerModule, ServerArgs, Options)
-%%                                                              -> {ok, Pid}
+%% @spec (RegisteredName, SupNamePrefix, Port,
+%%        HandlerModule, ServerArgs, Options) -> {ok, Pid}
 %%         RegisteredName = string()
 %%         SupNamePrefix  = atom()
 %%         Port           = integer()
@@ -104,7 +105,8 @@ get_supervisor_spec(SupNamePrefix, Port, HandlerModule, ServerArgs) ->
 %% @see get_supervisor_spec/5
 %% @end
 %%-------------------------------------------------------------------------
-start_link(RegisteredName, SupNamePrefix, Port, HandlerModule, ServerArgs, Options)
+start_link(RegisteredName, SupNamePrefix, Port,
+           HandlerModule, ServerArgs, Options)
   when is_atom(RegisteredName), is_list(SupNamePrefix), is_list(Options) ->
     supervisor:start_link({local, RegisteredName}, ?MODULE,
                           [SupNamePrefix, Port, HandlerModule,
@@ -118,7 +120,8 @@ start_link(RegisteredName, SupNamePrefix, Port, HandlerModule, ServerArgs, Optio
 %% @end
 %%-------------------------------------------------------------------------
 start_link(RegisteredName, SupNamePrefix, Port, HandlerModule, ServerArgs) ->
-    start_link(RegisteredName, SupNamePrefix, Port, HandlerModule, ServerArgs, []).
+    start_link(RegisteredName, SupNamePrefix, Port,
+               HandlerModule, ServerArgs, []).
 
 %%-------------------------------------------------------------------------
 %% @spec (SupName) -> {ok, Pid}
@@ -136,45 +139,53 @@ start_client(SupName) ->
 %%%------------------------------------------------------------------------
 
 %% @private
+%% @doc This is the socket listener supervisor callback.
 init([Name, Port, Module, ServerArgs, Options]) ->
     ListenerSupName   = create_name(Name, "listener"),
     ConnectionSupName = create_name(Name, "connection"),
     Args = [ListenerSupName, ConnectionSupName, Port, Module, Options],
+    ListenerStart = {gen_socket_listener, start_link, Args},
+    ClientStart = {supervisor, start_link,
+                   [{local, ConnectionSupName}, ?MODULE,
+                    [{connection, [Module, ServerArgs]}]]},
     {ok,
      {_SupFlags = {one_for_one, ?MAX_RESTART, ?MAX_TIME},
       [
        % Socket Listener
-       {ListenerSupName,                         % Id       = internal id
-        {gen_socket_listener,start_link,Args},   % StartFun = {M, F, A}
-        permanent,                               % Restart  = permanent | transient | temporary
-        2000,                                    % Shutdown = brutal_kill | int() >= 0 | infinity
-        worker,                                  % Type     = worker | supervisor
-        [gen_socket_listener]                    % Modules  = [Module] | dynamic
+       {ListenerSupName,       % Id       = internal id
+        ListenerStart,         % StartFun = {M, F, A}
+        permanent,             % Restart  = permanent | transient | temporary
+        2000,                  % Shutdown = brutal_kill | int() >= 0 | infinity
+        worker,                % Type     = worker | supervisor
+        [gen_socket_listener]  % Modules  = [Module] | dynamic
        },
+
        % Client instance supervisor
-       {ConnectionSupName,
-        {supervisor,start_link,[{local, ConnectionSupName}, ?MODULE, [{connection, [Module, ServerArgs]}]]},
-        permanent,                               % Restart  = permanent | transient | temporary
-        infinity,                                % Shutdown = brutal_kill | int() >= 0 | infinity
-        supervisor,                              % Type     = worker | supervisor
-        []                                       % Modules  = [Module] | dynamic
+       {ConnectionSupName,     % Id       = internal id
+        ClientStart,           % StartFun = {M, F, A}
+        permanent,             % Restart  = permanent | transient | temporary
+        infinity,              % Shutdown = brutal_kill | int() >= 0 | infinity
+        supervisor,            % Type     = worker | supervisor
+        []                     % Modules  = [Module] | dynamic
        }
       ]
      }
     };
 
-%% This one is called by the supervisor spec above.
+%% @private
+%% @doc This the client supervisor callback.
 init([{connection, [Module, Args]}]) ->
+    Start = {Module, start_link, Args},
     {ok,
      {_SupFlags = {simple_one_for_one, ?MAX_RESTART, ?MAX_TIME},
       [
        % Socket Client
-       {undefined,                % Id       = internal id
-        {Module,start_link,Args}, % StartFun = {M, F, A}
-        temporary,                % Restart  = permanent | transient | temporary
-        2000,                     % Shutdown = brutal_kill | int() >= 0 | infinity
-        worker,                   % Type     = worker | supervisor
-        []                        % Modules  = [Module] | dynamic
+       {undefined,             % Id       = internal id
+        Start,                 % StartFun = {M, F, A}
+        temporary,             % Restart  = permanent | transient | temporary
+        2000,                  % Shutdown = brutal_kill | int() >= 0 | infinity
+        worker,                % Type     = worker | supervisor
+        []                     % Modules  = [Module] | dynamic
        }
       ]
      }
