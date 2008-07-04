@@ -171,18 +171,18 @@ handle_info({inet_async, ListSock, Ref, {ok, CliSocket}},
             #state{listener=ListSock, acceptor=Ref,
                    module=Module, sup_name=SupName} = State) ->
     case set_sockopt(ListSock, CliSocket) of
-    ok ->
-        %% New client connected - spawn a new process using the simple_one_for_one
-        %% supervisor.
-        {ok, Pid} = gen_socket_listener_sup:start_client(SupName),
-        ok = gen_tcp:controlling_process(CliSocket, Pid),
-        %% Instruct the new process that it owns the socket.
-        Module:set_socket(Pid, CliSocket),
-        {ok, NewRef} = prim_inet:async_accept(ListSock, -1),
-        {noreply, State#state{acceptor=NewRef}};
-    {error, Reason} ->
-        error_logger:error_msg("Error setting socket options: ~p.\n", [Reason]),
-        {stop, Reason, State}
+        ok ->
+            % New client connected - spawn a new process using the
+            % simple_one_for_one supervisor.
+            {ok, Pid} = gen_socket_listener_sup:start_client(SupName),
+            ok = gen_tcp:controlling_process(CliSocket, Pid),
+            % Instruct the new process that it owns the socket.
+            Module:set_socket(Pid, CliSocket),
+            {ok, NewRef} = prim_inet:async_accept(ListSock, -1),
+            {noreply, State#state{acceptor=NewRef}};
+        {error, Reason} ->
+            error_logger:error_msg("Error setting socket options: ~p.\n", [Reason]),
+            {stop, Reason, State}
     end;
 
 handle_info({inet_async, ListSock, Ref, Error},
