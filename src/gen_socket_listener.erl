@@ -174,7 +174,7 @@ handle_info({inet_async, ListSock, Ref, {ok, CliSocket}},
         ok ->
             % New client connected - spawn a new process using the
             % simple_one_for_one supervisor.
-            {ok, Pid} = gen_socket_listener_sup:start_client(SupName),
+            {ok, Pid} = gen_socket_connection_sup:start_client(SupName),
             ok = gen_tcp:controlling_process(CliSocket, Pid),
             % Instruct the new process that it owns the socket.
             Module:set_socket(Pid, CliSocket),
