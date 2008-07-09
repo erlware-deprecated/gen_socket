@@ -41,9 +41,9 @@
 %% @spec (SupNamePrefix, Port, HandlerModule, ServerArgs, Options)
 %%                                                   -> SupSpec::tuple()
 %%         SupNamePrefix  = string()
-%%         Port           = integer()
+%%         Port           = integer() | [integer()]
 %%         HandlerModule  = atom()
-%%         ServerArgs     = [ term() ]
+%%         ServerArgs     = [term()]
 %%         Options        = list()
 %%
 %% @doc Generates the supervisor specification that can be used by the
@@ -90,9 +90,9 @@ get_supervisor_spec(SupNamePrefix, Port, HandlerModule, ServerArgs) ->
 %%        HandlerModule, ServerArgs, Options) -> {ok, Pid}
 %%         RegisteredName = string()
 %%         SupNamePrefix  = atom()
-%%         Port           = integer()
+%%         Port           = integer() | [integer()]
 %%         HandlerModule  = atom()
-%%         ServerArgs     = [ term() ]
+%%         ServerArgs     = [term()]
 %%         Options        = list()
 %%
 %% @doc To be called by the top-level application supervisor to
@@ -133,15 +133,15 @@ init([Name, Port, Module, ServerArgs, Options]) ->
                        [{local, ConnectionSupName}, gen_socket_connection_sup,
                         [{connection, [Module, ServerArgs]}]]},
 
-    ListenerSpec = make_listener_spec(Port, Name, ConnectionSupName, Module, Options, 1),
+    ListenerSpecs = make_listener_specs(Port, Name, ConnectionSupName,
+                                        Module, Options, 1),
 
     ClientSpec = {ConnectionSupName, ConnectionStart,
-                  permanent, infinity, supervisor,
-                  [gen_socket_connection_sup]},
+                  permanent, infinity, supervisor, [gen_socket_connection_sup]},
 
     SupFlags = {one_for_one, ?MAX_RESTART, ?MAX_TIME},
 
-    {ok, {SupFlags, [ClientSpec, ListenerSpec]}}.
+    {ok, {SupFlags, [ClientSpec | ListenerSpecs]}}.
 
 
 %%----------------------------------------------------------------------
@@ -156,4 +156,17 @@ make_listener_spec(Port, Name, ConnectionSupName, Module, Options, Count) ->
     ListenerSupName = create_name(Name, Suffix),
     Args = [ListenerSupName, ConnectionSupName, Port, Module, Options],
     ListenerStart = {gen_socket_listener, start_link, Args},
-    {ListenerSupName, ListenerStart, permanent, 2000, worker, [gen_socket_listener]}.
+    {ListenerSupName, ListenerStart,
+     permanent, 2000, worker, [gen_socket_listener]}.
+
+make_listener_specs(Port, Name, ConnectionSupName, Module, Options, Count)
+  when is_integer(Port) ->
+    [make_listener_spec(Port, Name, ConnectionSupName, Module, Options, Count)];
+make_listener_specs([], _Name, _ConnectionSupName, _Module, _Options, _Count) ->
+    [];
+make_listener_specs([Port | Ports], Name, ConnectionSupName,
+                    Module, Options, Count) ->
+    [make_listener_spec(Port, Name, ConnectionSupName,
+                        Module, Options, Count) |
+     make_listener_specs(Ports, Name, ConnectionSupName,
+                         Module, Options, Count + 1)].
