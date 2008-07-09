@@ -58,25 +58,28 @@ start_link(ListenerSupName, ConnectionSupName, Port, Module, Options)
 %%% Callback functions from gen_server
 %%%------------------------------------------------------------------------
 
-%%----------------------------------------------------------------------
-%% @spec (Port::integer()) -> {ok, State}           |
-%%                            {ok, State, Timeout}  |
-%%                            ignore                |
-%%                            {stop, Reason}
-%%
-%% @doc Called by gen_server framework at process startup.
-%%      Create listening socket.
-%% @end
+%%--------------------------------------------------------------------
 %% @private
-%%----------------------------------------------------------------------
+%% @doc
+%% Initiates the server
+%%
+%% @spec init(Args) -> {ok, State} |
+%%                     {ok, State, Timeout} |
+%%                     ignore |
+%%                     {stop, Reason}
+%% @end
+%%--------------------------------------------------------------------
 init([ConnSupName, Port, Module, Options]) ->
     process_flag(trap_exit, true),
     Opts = make_socket_opts(Port, Options),
     try
         case listen_socket(Port, Opts) of
-        {ok, LSock}          -> UdsPort = undefined;
-        {ok, UdsPort, LSock} -> ok;
-        Error                -> UdsPort = none, LSock = none, throw(Error)
+            {ok, LSock} ->
+                UdsPort = undefined;
+            {ok, UdsPort, LSock} ->
+                ok;
+            Error ->
+                UdsPort = none, LSock = none, throw(Error)
         end,
 
         % Create first accepting process
@@ -115,58 +118,64 @@ listen_socket(Filename, Opts) when is_list(Filename) ->
     % Open a UDS socket
     try
         case unixdom_drv:start() of
-        {ok, DrvPort}    -> ok;
-        {error, Reason}  -> DrvPort = undefined, throw({error, Reason});
-        {'EXIT', Reason} -> DrvPort = undefined, throw({error, Reason})
+            {ok, DrvPort} ->
+                ok;
+        {error, Reason} ->
+                DrvPort = undefined, throw({error, Reason});
+        {'EXIT', Reason} ->
+                DrvPort = undefined, throw({error, Reason})
         end,
         file:delete(Filename),
         case unixdom_drv:listen(DrvPort, Filename, Opts) of
-        {ok, LSock} ->
-            {ok, DrvPort, LSock};
-        Error ->
-            Error
+            {ok, LSock} ->
+                {ok, DrvPort, LSock};
+            Error ->
+                Error
         end
     catch What ->
         What
     end.
 
-%%-------------------------------------------------------------------------
-%% @spec (Request, From, State) -> {reply, Reply, State}          |
-%%                                 {reply, Reply, State, Timeout} |
-%%                                 {noreply, State}               |
-%%                                 {noreply, State, Timeout}      |
-%%                                 {stop, Reason, Reply, State}   |
-%%                                 {stop, Reason, State}
-%% @doc Callback for synchronous server calls.  If `{stop, ...}' tuple
-%%      is returned, the server is stopped and `terminate/2' is called.
-%% @end
+%%--------------------------------------------------------------------
 %% @private
-%%-------------------------------------------------------------------------
+%% @doc
+%% Handling call messages
+%%
+%% @spec handle_call(Request, From, State) ->
+%%                                   {reply, Reply, State} |
+%%                                   {reply, Reply, State, Timeout} |
+%%                                   {noreply, State} |
+%%                                   {noreply, State, Timeout} |
+%%                                   {stop, Reason, Reply, State} |
+%%                                   {stop, Reason, State}
+%% @end
+%%--------------------------------------------------------------------
 handle_call(Request, _From, State) ->
     {stop, {unknown_call, Request}, State}.
 
-%%-------------------------------------------------------------------------
-%% @spec (Msg, State) ->{noreply, State}          |
-%%                      {noreply, State, Timeout} |
-%%                      {stop, Reason, State}
-%% @doc Callback for asyncrous server calls.  If `{stop, ...}' tuple
-%%      is returned, the server is stopped and `terminate/2' is called.
-%% @end
+%%--------------------------------------------------------------------
 %% @private
-%%-------------------------------------------------------------------------
+%% @doc
+%% Handling cast messages
+%%
+%% @spec handle_cast(Msg, State) -> {noreply, State} |
+%%                                  {noreply, State, Timeout} |
+%%                                  {stop, Reason, State}
+%% @end
+%%--------------------------------------------------------------------
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-%%-------------------------------------------------------------------------
-%% @spec (Msg, State) ->{noreply, State}          |
-%%                      {noreply, State, Timeout} |
-%%                      {stop, Reason, State}
-%% @doc Callback for messages sent directly to server's mailbox.
-%%      If `{stop, ...}' tuple is returned, the server is stopped and
-%%      `terminate/2' is called.
-%% @end
+%%--------------------------------------------------------------------
 %% @private
-%%-------------------------------------------------------------------------
+%% @doc
+%% Handling all non call/cast messages
+%%
+%% @spec handle_info(Info, State) -> {noreply, State} |
+%%                                   {noreply, State, Timeout} |
+%%                                   {stop, Reason, State}
+%% @end
+%%--------------------------------------------------------------------
 handle_info({inet_async, ListSock, Ref, {ok, CliSocket}},
             #state{listener=ListSock, acceptor=Ref,
                    module=Module, sup_name=SupName} = State) ->
@@ -193,14 +202,17 @@ handle_info({inet_async, ListSock, Ref, Error},
 handle_info(_Info, State) ->
     {noreply, State}.
 
-%%-------------------------------------------------------------------------
-%% @spec (Reason, State) -> any
-%% @doc  Callback executed on server shutdown. It is only invoked if
-%%       `process_flag(trap_exit, true)' is set by the server process.
-%%       The return value is ignored.
-%% @end
+%%--------------------------------------------------------------------
 %% @private
-%%-------------------------------------------------------------------------
+%% @doc
+%% This function is called by a gen_server when it is about to
+%% terminate. It should be the opposite of Module:init/1 and do any
+%% necessary cleaning up. When it returns, the gen_server terminates
+%% with Reason. The return value is ignored.
+%%
+%% @spec terminate(Reason, State) -> void()
+%% @end
+%%--------------------------------------------------------------------
 terminate(_Reason, #state{uds_port=UdsPort, listener=LSock}) ->
     case UdsPort of
     undefined ->
@@ -209,12 +221,14 @@ terminate(_Reason, #state{uds_port=UdsPort, listener=LSock}) ->
         unixdom_drv:tcp_close(UdsPort, LSock)
     end.
 
-%%-------------------------------------------------------------------------
-%% @spec (OldVsn, State, Extra) -> {ok, NewState}
-%% @doc  Convert process state when code is changed.
-%% @end
+%%--------------------------------------------------------------------
 %% @private
-%%-------------------------------------------------------------------------
+%% @doc
+%% Convert process state when code is changed
+%%
+%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
+%% @end
+%%--------------------------------------------------------------------
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
@@ -222,16 +236,19 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%------------------------------------------------------------------------
 
-%% Taken from prim_inet.  We are merely copying some socket options from the
-%% listening socket to the new client socket.
+%% @private
+%% @doc Taken from prim_inet.  We are merely copying some socket options
+%% from the listening socket to the new client socket.
 set_sockopt(ListSock, CliSocket) ->
     true = inet_db:register_socket(CliSocket, inet_tcp),
     case prim_inet:getopts(ListSock, [active, nodelay, keepalive,
                                       delay_send, priority, tos]) of
     {ok, Opts} ->
         case prim_inet:setopts(CliSocket, Opts) of
-        ok    -> ok;
-        Error -> gen_tcp:close(CliSocket), Error
+            ok ->
+                ok;
+            Error ->
+                gen_tcp:close(CliSocket), Error
         end;
     Error ->
         gen_tcp:close(CliSocket), Error
