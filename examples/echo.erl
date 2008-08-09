@@ -20,17 +20,18 @@
 
 
 % Start the echo server demo on port 9999. This returns {ok, Pid}
-% where Pid is the socket listener supervisor. The gen_socket server
+% where Pid is the gen_socket supervisor. The gen_socket server
 % is implemented with two supervisors, one to manage the server which
 % accepts new connections on the listening socket, and one to manage
-% and create servers to handle each new connection.
+% and create servers to handle each new connection. The first supervisor
+% also supervises the second.
 %
 % The servers which manage the connection are implemented by client
 % code. This module implements a line-based echo server.
 %
-% In a real application, The socket listener supervisor
+% In a real application, The main gen_socket supervisor
 % would be started by a higher-level supervisor with a
-% spec created by gen_socket_listener_sup:get_supervisor_spec.
+% spec created by gen_socket_sup:get_supervisor_spec.
 %
 % @spec start_demo() -> {ok, Pid}
 start_demo() ->
@@ -39,13 +40,12 @@ start_demo() ->
     io:format("  telnet localhost 9999~n"),
     io:format("or~n"),
     io:format("  netcat localhost 9999~n~n"),
-    {ok, Pid} = gen_socket_listener_sup:start_link(echo, "echo",
-                                                   9999, echo, []),
+    {ok, Pid} = gen_socket_sup:start_link(echo, "echo", 9999, echo, []),
     unlink(Pid),
     Pid.
 
 % This is called by the connection supervisor when the
-% gen_socket_listener_sup:start_client function is called.
+% gen_socket_connection_sup:start_client function is called.
 % It starts a new server for a single connection.
 %
 % @spec start_link() -> {ok, Pid}

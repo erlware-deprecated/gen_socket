@@ -10,7 +10,7 @@
 %%%    init([]) ->
 %%%        % Socket Server supervisor specification
 %%%        SupSpec =
-%%%            gen_socket_listener_sup:get_supervisor_spec(
+%%%            gen_socket_sup:get_supervisor_spec(
 %%%                _NamePrefix    = "myserver",
 %%%                _ListenPort    = 9999,
 %%%                _HandlerModule = client_handling_module,
@@ -22,7 +22,7 @@
 %%% @end
 %%% Created 2007-07-14
 %%%-------------------------------------------------------------------
--module(gen_socket_listener_sup).
+-module(gen_socket_sup).
 -author('saleyn@gmail.com').
 
 -behaviour(supervisor).
@@ -51,7 +51,7 @@
 %%      application top supervisor's init/1 callback function that
 %%      wants to link socket server under its supervision tree.
 %%      `SupNamePrefix' is the prefix used for naming the listener supervisor
-%%      (SupNamePrefix ++ "listener_sup") and the connection manager supervisor
+%%      (SupNamePrefix ++ "gen_socket_sup") and the connection manager supervisor
 %%      (SupNamePrefix ++ "connection_sup").
 %%
 %%      `HandlerModule' is the module implementing a user protocol process,
@@ -68,12 +68,12 @@ get_supervisor_spec(SupNamePrefix, Port, HandlerModule, ServerArgs, Options) ->
                     HandlerModule, ServerArgs, Options],
     % Socket Listener
     {SupName,                    % Id       = internal id
-     {gen_socket_listener_sup,
+     {gen_socket_sup,
       start_link, ListenerArgs}, % StartFun = {M, F, A}
      permanent,                  % Restart  = permanent | transient | temporary
      2000,                       % Shutdown = brutal_kill | int() >= 0 | infinity
      worker,                     % Type     = worker | supervisor
-     [gen_socket_listener_sup]   % Modules  = [Module] | dynamic
+     [gen_socket_sup]            % Modules  = [Module] | dynamic
     }.
 
 %%-------------------------------------------------------------------------
@@ -90,12 +90,12 @@ get_supervisor_spec(SupNamePrefix, Port, HandlerModule, ServerArgs) ->
 %% @spec (SupNamePrefix, HandlerModule, Socket) -> {ok, Pid}
 %%
 %% @doc Given a socket (made from, e.g., gen_tcp:connect), start a handler
-%% module on the socket.
+%% module on the socket. This function must be called by the socket owner.
 %% @end
 %%-------------------------------------------------------------------------
 handle_socket(SupNamePrefix, HandlerModule, Socket) ->
     ConnectionSupName = create_connection_sup_name(SupNamePrefix),
-    {ok, Pid} = supervisor:start_child(ConnectionSupName, []),
+    {ok, Pid} = gen_socket_connection_sup:start_client(ConnectionSupName),
     ok = gen_tcp:controlling_process(Socket, Pid),
     HandlerModule:set_socket(Pid, Socket),
     {ok, Pid}.
