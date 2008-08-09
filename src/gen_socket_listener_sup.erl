@@ -97,7 +97,7 @@ handle_socket(SupNamePrefix, HandlerModule, Socket) ->
     ConnectionSupName = create_connection_sup_name(SupNamePrefix),
     {ok, Pid} = supervisor:start_child(ConnectionSupName, []),
     ok = gen_tcp:controlling_process(Socket, Pid),
-    ok = HandlerModule:set_socket(Pid, Socket),
+    HandlerModule:set_socket(Pid, Socket),
     {ok, Pid}.
 
 %%-------------------------------------------------------------------------
