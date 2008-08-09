@@ -29,7 +29,8 @@
 
 %% External API
 -export([start_link/6, start_link/5,
-         get_supervisor_spec/5, get_supervisor_spec/4]).
+         get_supervisor_spec/5, get_supervisor_spec/4,
+         handle_socket/3]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -62,7 +63,7 @@
 %% @end
 %%-------------------------------------------------------------------------
 get_supervisor_spec(SupNamePrefix, Port, HandlerModule, ServerArgs, Options) ->
-    SupName      = create_name(SupNamePrefix, "socket_server"),
+    SupName = create_name(SupNamePrefix, "gen_socket"),
     ListenerArgs = [SupName, SupNamePrefix, Port,
                     HandlerModule, ServerArgs, Options],
     % Socket Listener
@@ -84,6 +85,20 @@ get_supervisor_spec(SupNamePrefix, Port, HandlerModule, ServerArgs, Options) ->
 %%-------------------------------------------------------------------------
 get_supervisor_spec(SupNamePrefix, Port, HandlerModule, ServerArgs) ->
     get_supervisor_spec(SupNamePrefix, Port, HandlerModule, ServerArgs, []).
+
+%%-------------------------------------------------------------------------
+%% @spec (SupNamePrefix, HandlerModule, Socket) -> {ok, Pid}
+%%
+%% @doc Given a socket (made from, e.g., gen_tcp:connect), start a handler
+%% module on the socket.
+%% @end
+%%-------------------------------------------------------------------------
+handle_socket(SupNamePrefix, HandlerModule, Socket) ->
+    ConnectionSupName = create_connection_sup_name(SupNamePrefix),
+    {ok, Pid} = supervisor:start_child(ConnectionSupName, []),
+    ok = gen_tcp:controlling_process(Socket, Pid),
+    ok = HandlerModule:set_socket(Pid, Socket),
+    {ok, Pid}.
 
 %%-------------------------------------------------------------------------
 %% @spec (RegisteredName, SupNamePrefix, Port,
@@ -127,7 +142,7 @@ start_link(RegisteredName, SupNamePrefix, Port, HandlerModule, ServerArgs) ->
 %% @private
 %% @doc This is the socket listener supervisor callback.
 init([Name, Port, Module, ServerArgs, Options]) ->
-    ConnectionSupName = create_name(Name, "connection"),
+    ConnectionSupName = create_connection_sup_name(Name),
 
     ConnectionStart = {supervisor, start_link,
                        [{local, ConnectionSupName}, gen_socket_connection_sup,
@@ -150,6 +165,9 @@ init([Name, Port, Module, ServerArgs, Options]) ->
 
 create_name(Name, Prefix) ->
     list_to_atom(Name ++ "_" ++ Prefix ++ "_sup").
+
+create_connection_sup_name(Name) ->
+    create_name(Name, "connection").
 
 make_listener_spec(Port, Name, ConnectionSupName, Module, Options, Count) ->
     Suffix = "listener" ++ integer_to_list(Count),
