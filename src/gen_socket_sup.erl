@@ -50,8 +50,8 @@
 %% @doc Generates the supervisor specification that can be used by the
 %%      application top supervisor's init/1 callback function that
 %%      wants to link socket server under its supervision tree.
-%%      `SupNamePrefix' is the prefix used for naming the listener supervisor
-%%      (SupNamePrefix ++ "gen_socket_sup") and the connection manager supervisor
+%%      `SupNamePrefix' is the prefix used for naming the main supervisor
+%%      (SupNamePrefix ++ "gen_socket_sup") and the connection supervisor
 %%      (SupNamePrefix ++ "connection_sup").
 %%
 %%      `HandlerModule' is the module implementing a user protocol process,
